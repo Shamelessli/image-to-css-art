@@ -59,6 +59,7 @@ def build_parser():
     convert.add_argument("--no-gradients", action="store_true")
     convert.add_argument("--no-underpainting", action="store_true")
     convert.add_argument("--max-output-mb", type=positive_float, default=64, help="HTML size budget in MiB (default 64)")
+    convert.add_argument("--score", action="store_true", help="Rasterize the shapes offline and report MAE against the reference")
     convert.add_argument("--report", type=Path, help="Optional machine-readable JSON report")
     convert.add_argument("--force", action="store_true", help="Replace existing output/report files")
     convert.add_argument("--quiet", action="store_true", help="Suppress progress on stderr; retain JSON result on stdout")
@@ -130,7 +131,7 @@ def convert(args):
         reference, labels, palette, original, background=args.background, title=args.title,
         epsilon=config["epsilon"], gradients=not args.no_gradients,
         underpainting=not args.no_underpainting,
-        max_bytes=int(args.max_output_mb * 1024 * 1024), progress=progress,
+        max_bytes=int(args.max_output_mb * 1024 * 1024), progress=progress, score=args.score,
     )
     audit = audit_html(document)
     if not audit["valid"]:

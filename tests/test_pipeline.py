@@ -111,6 +111,17 @@ class PipelineTests(unittest.TestCase):
         self.assertIn("&lt;script&gt;", document)
         self.assertTrue(report["audit"]["valid"])
 
+    def test_score_reports_similarity(self):
+        values = np.linspace(20, 230, 128).astype(np.uint8)
+        array = np.empty((64, 128, 3), np.uint8)
+        array[:] = np.stack((values, values, np.full(128, 170)), axis=1)
+        _, scored = self.convert(Image.fromarray(array), "--colors", "8", "--score")
+        self.assertIn("similarity", scored)
+        self.assertLess(scored["similarity"]["mae"], 60)
+        self.assertLessEqual(scored["similarity"]["mae_thumbnail"], scored["similarity"]["mae"] + 5)
+        _, plain = self.convert(Image.fromarray(array), "--colors", "8", "--force")
+        self.assertNotIn("similarity", plain)
+
     def test_distant_detail_is_not_merged(self):
         labels = np.zeros((12, 12), np.uint8)
         labels[5, 5] = 1

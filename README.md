@@ -94,6 +94,7 @@ Linux/macOS 使用 `.venv/bin/python`。转换完成后直接在浏览器打开 
 | `--max-output-mb 32` | HTML 体积预算，单位 MiB，默认 64 |
 | `--report .work/report.json` | 写入轮廓数、渐变数、依赖版本及 SHA-256 |
 | `--no-gradients` / `--no-underpainting` | 关闭局部渐变 / 防接缝底色 |
+| `--score` | 离线栅格化并与参考图对比，在报告中写入 MAE 差异度 |
 | `--force` | 明确覆盖已有输出与报告 |
 
 ### 输出约束

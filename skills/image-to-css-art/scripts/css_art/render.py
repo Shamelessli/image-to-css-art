@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 
 from .geometry import bridge_rings, component_rings, hex_color, mask_polygon, number, polygon_css
+from .quality import Rasterizer
 from .regions import label_components, quantize
 
 
@@ -43,7 +44,7 @@ def same_as_matte(rgb, background):
 
 
 class ContourRenderer:
-    def __init__(self, reference, background, epsilon, gradients, max_bytes):
+    def __init__(self, reference, background, epsilon, gradients, max_bytes, score=False):
         self.reference = reference
         self.height, self.width = reference.shape[:2]
         self.background = np.array(background)
@@ -52,6 +53,7 @@ class ContourRenderer:
         self.max_bytes = max_bytes
         self.byte_count = 0
         self.paint_classes = {}
+        self.raster = Rasterizer((self.width, self.height), background) if score else None
         self.stats = {"shapes": 0, "gradient_fills": 0, "polygon_vertices": 0, "interior_holes": 0, "underpainting_shapes": 0}
 
     def account(self, text):
@@ -91,6 +93,8 @@ class ContourRenderer:
         )
         self.stats["shapes"] += 1
         self.stats["polygon_vertices"] += len(points)
+        if self.raster is not None:
+            self.raster.fill_rings(points, origin, size, paint)
         return self.account(f'<div class="{cls}" style="{style}"></div>')
 
     def foreground(self, labels, palette, progress):
@@ -152,6 +156,9 @@ class ContourRenderer:
             polygon, vertices = mask_polygon(mask, .26, 1)
             if polygon:
                 parts.append(self.account(f'<div class="shape" style="inset:0;background:{hex_color(rgb)};clip-path:{polygon}"></div>'))
+                if self.raster is not None:
+                    full = cv2.resize(mask, (self.width, self.height), interpolation=cv2.INTER_NEAREST)
+                    self.raster.fill_mask(full > 0, 0, 0, hex_color(rgb))
                 self.stats["polygon_vertices"] += vertices
                 self.stats["shapes"] += 1
                 self.stats["underpainting_shapes"] += 1
@@ -159,8 +166,8 @@ class ContourRenderer:
 
 
 def render_document(reference, labels, palette, original_size, *, background, title,
-                    epsilon, gradients, underpainting, max_bytes, progress):
-    renderer = ContourRenderer(reference, background, epsilon, gradients, max_bytes)
+                    epsilon, gradients, underpainting, max_bytes, progress, score=False):
+    renderer = ContourRenderer(reference, background, epsilon, gradients, max_bytes, score)
     foundation = renderer.underpainting() if underpainting else ""
     shapes = renderer.foreground(labels, palette, progress)
     width, height = original_size
@@ -195,4 +202,7 @@ html,body{{margin:0;min-height:100%;background:{matte}}}
 '''
     if len(document.encode("utf-8")) > max_bytes:
         raise ValueError("HTML exceeds --max-output-mb; reduce --max-width/--colors or raise the limit.")
+    if renderer.raster is not None:
+        detail, thumbnail = renderer.raster.errors(reference)
+        renderer.stats["similarity"] = {"mae": detail, "mae_thumbnail": thumbnail}
     return document, renderer.stats

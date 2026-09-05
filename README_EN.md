@@ -93,6 +93,7 @@ Common options:
 | `--max-output-mb 32` | HTML size budget in MiB, defaults to 64 |
 | `--report .work/report.json` | Writes contour count, gradient count, dependency versions and SHA-256 |
 | `--no-gradients` / `--no-underpainting` | Disable local gradients / the anti-seam underpainting |
+| `--score` | Rasterize the shapes offline and report MAE against the reference |
 | `--force` | Explicitly overwrite existing output and report |
 
 ### Output constraints

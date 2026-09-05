@@ -42,4 +42,8 @@ before writing the final document. It is not a limit on peak RAM or computation 
   Different Pillow/OpenCV/NumPy versions can change quantization or floating-point fitting.
 - The audit checks this generator's dialect. It is not a sanitizer for arbitrary hostile HTML
   and does not measure visual similarity. Treat browser QA as a separate required step.
+- `--score` rasterizes the emitted shapes offline (solids and linear gradients) and writes
+  `similarity.mae` and `similarity.mae_thumbnail` (mean absolute error, 0-255, lower is
+  better) to the report. It is an authoring-time estimate of the approximation, not a
+  substitute for viewing the result in a browser.
 - The MIT license covers this project's code and original fixtures, not rights to input artwork.
