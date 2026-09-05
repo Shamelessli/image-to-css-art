@@ -12,7 +12,7 @@
 
 欢迎路过盒U
 
-[GitHub](https://github.com/AvroraCL/image-to-css-art) · [GitCode](https://gitcode.com/HelenaSG/image-to-css-art) · [下载](https://github.com/AvroraCL/image-to-css-art/releases)
+[GitHub](https://github.com/AvroraCL/image-to-css-art) · [GitCode](https://gitcode.com/HelenaSG/image-to-css-art) · [下载](https://github.com/AvroraCL/image-to-css-art/releases) · [English](README_EN.md)
 
 </div>
 
