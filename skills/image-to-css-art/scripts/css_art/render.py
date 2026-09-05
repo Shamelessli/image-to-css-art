@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 
 from .geometry import bridge_rings, component_rings, hex_color, mask_polygon, number, polygon_css
-from .regions import quantize
+from .regions import label_components, quantize
 
 
 def paint_for_region(reference, mask, x, y, width, height, gradients):
@@ -78,17 +78,20 @@ class ContourRenderer:
 
     def foreground(self, labels, palette, progress):
         parts = []
+        # One crop-based labeling pass replaces per-color full-image labeling.
+        ids, colors_by_component, areas, boxes, centers = label_components(labels)
+        components_of = {}
+        for component in range(1, len(colors_by_component)):
+            components_of.setdefault(int(colors_by_component[component]), []).append(component)
         order = color_order(labels, palette)
         for position, color in enumerate(order):
             rgb = palette[color]
             if same_as_matte(rgb, self.background):
                 continue
-            count, ids, stats, centers = cv2.connectedComponentsWithStats(
-                (labels == color).astype(np.uint8), connectivity=8
-            )
             small_groups = {}
-            for component in range(1, count):
-                x, y, width, height, area = map(int, stats[component])
+            for component in components_of.get(int(color), ()):
+                x, y, width, height = map(int, boxes[component])
+                area = int(areas[component])
                 mask = (ids[y:y + height, x:x + width] == component).astype(np.uint8)
                 paint, gradient = paint_for_region(self.reference, mask, x, y, width, height, self.gradients) if area >= 24 else (hex_color(rgb), False)
                 for rings in component_rings(mask, x, y, area, self.epsilon):

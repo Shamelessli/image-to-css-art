@@ -125,18 +125,24 @@ class PipelineTests(unittest.TestCase):
             width = int(rng.integers(1, 14))
             count = int(rng.integers(1, 6))
             labels = rng.integers(0, count, (height, width), dtype=np.uint8)
-            ids, colors, areas = label_components(labels)
+            ids, colors, areas, boxes, centers = label_components(labels)
             expected_ids = np.zeros(labels.shape, np.int32)
             expected_colors, expected_areas = [0], [0]
+            expected_boxes, expected_centers = [(0, 0, 0, 0)], [(0.0, 0.0)]
             offset = 0
             for color in np.unique(labels):
-                components, local, stats, _ = cv2.connectedComponentsWithStats(
+                components, local, stats, centroids = cv2.connectedComponentsWithStats(
                     (labels == color).astype(np.uint8), connectivity=8
                 )
                 selected = local > 0
                 expected_ids[selected] = local[selected] + offset
                 expected_colors.extend([int(color)] * (components - 1))
                 expected_areas.extend(stats[1:, cv2.CC_STAT_AREA])
+                expected_boxes.extend(zip(
+                    stats[1:, cv2.CC_STAT_LEFT], stats[1:, cv2.CC_STAT_TOP],
+                    stats[1:, cv2.CC_STAT_WIDTH], stats[1:, cv2.CC_STAT_HEIGHT],
+                ))
+                expected_centers.extend(zip(centroids[1:, 0], centroids[1:, 1]))
                 offset += components - 1
             values, first = np.unique(ids.ravel(), return_index=True)
             mapping = np.zeros(int(ids.max()) + 2, np.int64)
@@ -148,6 +154,8 @@ class PipelineTests(unittest.TestCase):
                 sorted(zip(np.asarray(expected_colors)[1:].tolist(), np.asarray(expected_areas)[1:].tolist())),
                 trial,
             )
+            self.assertTrue(np.array_equal(boxes, np.asarray(expected_boxes, dtype=np.int32)[mapping[:len(boxes)]]), trial)
+            self.assertTrue(np.allclose(centers, np.asarray(expected_centers, dtype=np.float64)[mapping[:len(centers)]], atol=1e-9), trial)
 
     def test_no_overwrite_or_partial_file_when_budget_exceeded(self):
         source, output = self.root / "in.png", self.root / "out.html"

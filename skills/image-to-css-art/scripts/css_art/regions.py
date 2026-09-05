@@ -41,11 +41,13 @@ def quantize(reference: np.ndarray, colors: int):
 def label_components(labels):
     """Label 8-connected same-color components in one pass over the image.
 
-    Components are numbered by ascending color value exactly like the previous
-    per-color full-image cv2 labeling, while only the per-color bounding-box
-    crops make the pass cheaper. Returns the int32 component image (0 outside
-    components) plus parallel color and area arrays indexed by component id,
-    with a placeholder at index 0.
+    Components are numbered by ascending color value, then cv2's crop-scan
+    order — deterministic for a given dependency environment, like the rest
+    of the pipeline. Only the per-color bounding-box crops make the pass
+    cheaper than one full-image mask per palette color. Returns the int32
+    component image (0 outside components) plus parallel color, area,
+    bounding-box (x, y, w, h) and centroid arrays indexed by component id,
+    each with a placeholder at index 0.
     """
     width = labels.shape[1]
     ids = np.zeros(labels.shape, np.int32)
@@ -56,6 +58,7 @@ def label_components(labels):
     colors = grouped[starts]
     ends = np.concatenate((starts[1:], [grouped.size]))
     component_colors, component_areas = [0], [0]
+    component_boxes, component_centers = [(0, 0, 0, 0)], [(0.0, 0.0)]
     offset = 0
     for color, start, end in zip(colors, starts, ends):
         span = order[start:end]
@@ -64,16 +67,27 @@ def label_components(labels):
         y0, y1 = int(ys.min()), int(ys.max())
         x0, x1 = int(xs.min()), int(xs.max())
         crop = (labels[y0:y1 + 1, x0:x1 + 1] == color).astype(np.uint8)
-        count, local, stats, _ = cv2.connectedComponentsWithStats(crop, connectivity=8)
+        count, local, stats, centers = cv2.connectedComponentsWithStats(crop, connectivity=8)
         if count == 1:
             continue
         region = ids[y0:y1 + 1, x0:x1 + 1]
-        foreground = local > 0
-        region[foreground] = local[foreground] + offset
+        mask = local > 0
+        region[mask] = local[mask] + offset
         component_colors.extend([int(color)] * (count - 1))
         component_areas.extend(stats[1:, cv2.CC_STAT_AREA].tolist())
+        component_boxes.extend(zip(
+            stats[1:, cv2.CC_STAT_LEFT] + x0,
+            stats[1:, cv2.CC_STAT_TOP] + y0,
+            stats[1:, cv2.CC_STAT_WIDTH],
+            stats[1:, cv2.CC_STAT_HEIGHT],
+        ))
+        component_centers.extend(zip(
+            centers[1:, 0] + x0, centers[1:, 1] + y0,
+        ))
         offset += count - 1
-    return ids, np.asarray(component_colors), np.asarray(component_areas)
+    return (ids, np.asarray(component_colors), np.asarray(component_areas),
+            np.asarray(component_boxes, dtype=np.int32),
+            np.asarray(component_centers, dtype=np.float64))
 
 
 def merge_regions(labels, palette, passes=4, progress=lambda _: None):
@@ -85,7 +99,7 @@ def merge_regions(labels, palette, passes=4, progress=lambda _: None):
     labels = labels.copy()
     original = labels.copy()
     for iteration in range(passes):
-        ids, component_colors, component_areas = label_components(labels)
+        ids, component_colors, component_areas, _, _ = label_components(labels)
         component_colors = np.asarray(component_colors)
         component_areas = np.asarray(component_areas)
         proposals = []
