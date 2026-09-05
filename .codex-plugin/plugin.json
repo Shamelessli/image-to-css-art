@@ -1,6 +1,6 @@
 {
   "name": "image-to-css-art",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Offline image-to-CSS contour tracing with local gradients and standalone HTML output.",
   "author": {
     "name": "AvroraCL",
