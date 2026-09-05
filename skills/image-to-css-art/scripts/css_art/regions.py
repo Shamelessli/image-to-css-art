@@ -38,6 +38,44 @@ def quantize(reference: np.ndarray, colors: int):
     return labels, palette
 
 
+def label_components(labels):
+    """Label 8-connected same-color components in one pass over the image.
+
+    Components are numbered by ascending color value exactly like the previous
+    per-color full-image cv2 labeling, while only the per-color bounding-box
+    crops make the pass cheaper. Returns the int32 component image (0 outside
+    components) plus parallel color and area arrays indexed by component id,
+    with a placeholder at index 0.
+    """
+    width = labels.shape[1]
+    ids = np.zeros(labels.shape, np.int32)
+    flat = labels.ravel()
+    order = np.argsort(flat, kind="stable")
+    grouped = flat[order]
+    starts = np.flatnonzero(np.concatenate(([True], grouped[1:] != grouped[:-1])))
+    colors = grouped[starts]
+    ends = np.concatenate((starts[1:], [grouped.size]))
+    component_colors, component_areas = [0], [0]
+    offset = 0
+    for color, start, end in zip(colors, starts, ends):
+        span = order[start:end]
+        ys = span // width
+        xs = span - ys * width
+        y0, y1 = int(ys.min()), int(ys.max())
+        x0, x1 = int(xs.min()), int(xs.max())
+        crop = (labels[y0:y1 + 1, x0:x1 + 1] == color).astype(np.uint8)
+        count, local, stats, _ = cv2.connectedComponentsWithStats(crop, connectivity=8)
+        if count == 1:
+            continue
+        region = ids[y0:y1 + 1, x0:x1 + 1]
+        foreground = local > 0
+        region[foreground] = local[foreground] + offset
+        component_colors.extend([int(color)] * (count - 1))
+        component_areas.extend(stats[1:, cv2.CC_STAT_AREA].tolist())
+        offset += count - 1
+    return ids, np.asarray(component_colors), np.asarray(component_areas)
+
+
 def merge_regions(labels, palette, passes=4, progress=lambda _: None):
     """Merge tiny components into adjacent, larger, similar-colored components.
 
@@ -47,18 +85,7 @@ def merge_regions(labels, palette, passes=4, progress=lambda _: None):
     labels = labels.copy()
     original = labels.copy()
     for iteration in range(passes):
-        ids = np.zeros(labels.shape, np.int32)
-        component_colors, component_areas = [0], [0]
-        offset = 0
-        for color in np.unique(labels):
-            count, local, stats, _ = cv2.connectedComponentsWithStats(
-                (labels == color).astype(np.uint8), connectivity=8
-            )
-            selected = local > 0
-            ids[selected] = local[selected] + offset
-            component_colors.extend([int(color)] * (count - 1))
-            component_areas.extend(stats[1:, cv2.CC_STAT_AREA])
-            offset += count - 1
+        ids, component_colors, component_areas = label_components(labels)
         component_colors = np.asarray(component_colors)
         component_areas = np.asarray(component_areas)
         proposals = []

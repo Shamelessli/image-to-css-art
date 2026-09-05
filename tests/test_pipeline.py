@@ -1,20 +1,23 @@
 import contextlib
+import errno
 import io
 import json
 from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
+import cv2
 import numpy as np
 from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "skills/image-to-css-art/scripts"))
 from css_art.audit import audit_html
-from css_art.cli import main
+from css_art.cli import atomic_write, main
 from css_art.geometry import bridge_rings
-from css_art.regions import load_reference, merge_regions
+from css_art.regions import label_components, load_reference, merge_regions
 
 
 class PipelineTests(unittest.TestCase):
@@ -115,6 +118,37 @@ class PipelineTests(unittest.TestCase):
         result = merge_regions(labels, palette)
         self.assertEqual(result[5, 5], 1)
 
+    def test_component_labeling_matches_per_color_reference(self):
+        rng = np.random.default_rng(11)
+        for trial in range(40):
+            height = int(rng.integers(1, 14))
+            width = int(rng.integers(1, 14))
+            count = int(rng.integers(1, 6))
+            labels = rng.integers(0, count, (height, width), dtype=np.uint8)
+            ids, colors, areas = label_components(labels)
+            expected_ids = np.zeros(labels.shape, np.int32)
+            expected_colors, expected_areas = [0], [0]
+            offset = 0
+            for color in np.unique(labels):
+                components, local, stats, _ = cv2.connectedComponentsWithStats(
+                    (labels == color).astype(np.uint8), connectivity=8
+                )
+                selected = local > 0
+                expected_ids[selected] = local[selected] + offset
+                expected_colors.extend([int(color)] * (components - 1))
+                expected_areas.extend(stats[1:, cv2.CC_STAT_AREA])
+                offset += components - 1
+            values, first = np.unique(ids.ravel(), return_index=True)
+            mapping = np.zeros(int(ids.max()) + 2, np.int64)
+            mapping[values] = expected_ids.ravel()[first]
+            self.assertEqual(len(set(mapping[values].tolist())), len(values), trial)
+            self.assertTrue(np.array_equal(mapping[ids], expected_ids), trial)
+            self.assertEqual(
+                sorted(zip(colors[1:].tolist(), areas[1:].tolist())),
+                sorted(zip(np.asarray(expected_colors)[1:].tolist(), np.asarray(expected_areas)[1:].tolist())),
+                trial,
+            )
+
     def test_no_overwrite_or_partial_file_when_budget_exceeded(self):
         source, output = self.root / "in.png", self.root / "out.html"
         Image.new("RGB", (16, 16), "red").save(source)
@@ -129,6 +163,25 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(status, 1)
         with Image.open(source) as image:
             self.assertEqual(image.size, (16, 16))
+
+    def test_unexpected_conversion_errors_are_reported(self):
+        source, output = self.root / "in.png", self.root / "out.html"
+        Image.new("RGB", (8, 8), "red").save(source)
+        with mock.patch("css_art.cli.convert", side_effect=MemoryError()):
+            status, _, stderr = self.run_cli("convert", source, "-o", output, "--quiet")
+        self.assertEqual(status, 1)
+        self.assertIn("MemoryError", stderr)
+        self.assertFalse(output.exists())
+
+    def test_atomic_write_survives_filesystems_without_hardlinks(self):
+        target = self.root / "no-links.html"
+        with mock.patch("os.link", side_effect=OSError(errno.EPERM, "hard links unavailable")):
+            atomic_write(target, "first", False)
+            self.assertEqual(target.read_text(encoding="utf-8"), "first")
+            target.write_text("keep", encoding="utf-8")
+            with self.assertRaises(OSError):
+                atomic_write(target, "second", False)
+        self.assertEqual(target.read_text(encoding="utf-8"), "keep")
 
     def test_audit_rejects_forbidden_resources(self):
         document, _ = self.convert(Image.new("RGB", (8, 8), "blue"))

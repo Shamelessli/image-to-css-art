@@ -90,8 +90,16 @@ def atomic_write(path: Path, text: str, force: bool):
         if force:
             os.replace(temporary, path)
         else:
-            # Hard-link installation is atomic and refuses a concurrent overwrite.
-            os.link(temporary, path)
+            try:
+                # Hard-link installation is atomic and refuses a concurrent overwrite.
+                os.link(temporary, path)
+            except OSError:
+                if path.exists():
+                    raise
+                # Filesystems without hard links (FAT32, some network shares) fall
+                # back to exclusive creation, which still refuses an existing file.
+                with open(path, "xb") as target:
+                    target.write(temporary.read_bytes())
         temporary.unlink(missing_ok=True)
     finally:
         if temporary is not None:
@@ -146,6 +154,11 @@ def main(argv=None):
         report = convert(args) if args.command == "convert" else audit_file(args.input)
     except (OSError, ValueError, ImportError) as error:
         print(f"Error: {error}", file=sys.stderr)
+        return 1
+    except Exception as error:
+        # cv2.error subclasses Exception directly and cv2 is imported only inside
+        # convert, so oversized or pathological inputs cannot be named here.
+        print(f"Error: {type(error).__name__}: {error}", file=sys.stderr)
         return 1
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0 if report.get("valid", True) else 1
