@@ -27,7 +27,9 @@ Image to CSS Art 是一个带有独立命令行工具的 AI Agent 技能（Skill
 - 将插画、色块图和其他静态位图转换为单文件 HTML。
 - 保留原图比例，以 CSS `clip-path` 绘制轮廓、孔洞与细线。
 - 在较大色块内拟合渐变，并用内层底色改善缩小显示时的接缝。
-- 提供 `preview`、`balanced`、`faithful` 三档精度及体积限制。
+- 提供 `preview`、`balanced`、`faithful` 三档精度；`--fit 20` 按目标体积自动降档适配。
+- 在 Oklab 感知色彩空间做中位切分量化，色带与细节丢失更少，同档体积更小。
+- 用 `--score` 离线栅格化评分，在报告中量化成品与参考图的差异（MAE）。
 - 支持中文路径、EXIF 方向、透明图片的背景合成和 JSON 转换报告。
 - 自动检查成品的 HTML/CSS 结构约束。
 
@@ -48,6 +50,8 @@ Image to CSS Art 是一个带有独立命令行工具的 AI Agent 技能（Skill
 | [SHA256SUMS.txt](https://github.com/AvroraCL/image-to-css-art/releases/download/v0.1.1/SHA256SUMS.txt) | 两个压缩包的 SHA-256 校验值 |
 
 源代码同步保存在 [GitCode](https://gitcode.com/HelenaSG/image-to-css-art)。压缩包不内置 Python 或第三方依赖。
+
+以上压缩包对应 v0.1.1 标签。`--fit`、`--score` 与 Oklab 量化是发布后的改进，已合入主线，可从源码直接使用，将随下一个版本发布。
 
 ### 系统要求
 

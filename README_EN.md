@@ -25,7 +25,9 @@ This is an independent community tool. Conversion is lossy automatic contour tra
 - Converts illustrations, flat-color artwork and other static bitmaps into a single-file HTML document.
 - Preserves the original aspect ratio and draws contours, holes and thin lines with CSS `clip-path`.
 - Fits gradients inside larger color regions and adds an underpainting layer to reduce seams at small display sizes.
-- Offers `preview`, `balanced` and `faithful` quality presets plus an output size budget.
+- Offers `preview`, `balanced` and `faithful` quality presets; `--fit 20` adapts automatically to a target size.
+- Runs median-cut quantization in perceptual Oklab space for less banding and smaller outputs at the same preset.
+- Scores results offline with `--score`, reporting MAE against the reference in the JSON report.
 - Handles non-ASCII paths, EXIF orientation, alpha compositing onto a matte, and JSON conversion reports.
 - Automatically checks the structural constraints of the generated HTML/CSS.
 
@@ -46,6 +48,8 @@ The image above is a repository-made **input test image**; the [matching pure CS
 | [SHA256SUMS.txt](https://github.com/AvroraCL/image-to-css-art/releases/download/v0.1.1/SHA256SUMS.txt) | SHA-256 checksums for both archives |
 
 Source code is also mirrored on [GitCode](https://gitcode.com/HelenaSG/image-to-css-art). The archives do not bundle Python or third-party dependencies.
+
+The archives above match the v0.1.1 tag. `--fit`, `--score` and Oklab quantization landed after that release; they are on main and usable from source, and will ship with the next release.
 
 ### Requirements
 
