@@ -19,7 +19,8 @@ mark the point where the budget tripped.
 ## Pipeline
 
 1. Apply EXIF orientation, composite alpha onto the chosen matte, resize, and bilateral-filter.
-2. Median-cut color quantization without dithering.
+2. Median-cut color quantization in perceptual Oklab space, without dithering;
+   palette entries are the sRGB means of their Oklab buckets.
 3. Merge components smaller than 16 pixels only into adjacent, larger, similar-color regions.
    Maximum per-channel color distance is 18; cumulative drift from original labels is 23.
 4. Trace contours at 4x sampling. Slightly dilate, smooth and simplify them at subpixel scale.

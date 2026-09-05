@@ -17,7 +17,7 @@ sys.path.insert(0, str(ROOT / "skills/image-to-css-art/scripts"))
 from css_art.audit import audit_html
 from css_art.cli import atomic_write, main
 from css_art.geometry import bridge_rings
-from css_art.regions import label_components, load_reference, merge_regions
+from css_art.regions import label_components, load_reference, merge_regions, quantize
 
 
 class PipelineTests(unittest.TestCase):
@@ -70,6 +70,19 @@ class PipelineTests(unittest.TestCase):
         Image.new("RGB", (10, 1000), "blue").save(source)
         reference, _ = load_reference(source, 100, (255, 255, 255))
         self.assertEqual(reference.shape[:2], (200, 2))
+
+    def test_quantizer_clusters_and_survives_flat_input(self):
+        array = np.zeros((16, 16, 3), np.uint8)
+        array[:, :8] = (200, 30, 40)
+        array[:, 8:] = (10, 60, 120)
+        labels, palette = quantize(array, 4)
+        self.assertEqual(len(np.unique(labels)), 2)
+        for rgb in palette:
+            distance = min(sum(abs(int(a) - int(b)) for a, b in zip(rgb, color))
+                           for color in ((200, 30, 40), (10, 60, 120)))
+            self.assertLess(distance, 30)
+        flat_labels, _ = quantize(np.full((8, 8, 3), 7, np.uint8), 4)
+        self.assertEqual(len(np.unique(flat_labels)), 1)
 
     def test_holes_survive_and_output_is_deterministic(self):
         image = Image.new("RGB", (96, 96), "white")

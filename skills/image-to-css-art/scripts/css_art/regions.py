@@ -29,13 +29,78 @@ def load_reference(path: Path, max_width: int, background: tuple[int, int, int])
     return reference, original_size
 
 
+OKLAB_FROM_LINEAR = np.array([
+    [0.4122214708, 0.5363325363, 0.0514459929],
+    [0.2119034982, 0.6806995451, 0.1073969566],
+    [0.0883024619, 0.2817188376, 0.6299787005],
+], np.float32)
+OKLAB_FROM_LMS_PRIME = np.array([
+    [0.2104542553, 0.7936177850, -0.0040720468],
+    [1.9779984951, -2.4285922050, 0.4505937099],
+    [0.0259040371, 0.7827717662, -0.8086757660],
+], np.float32)
+
+
+def oklab_of(rgb: np.ndarray) -> np.ndarray:
+    """Map an (n, 3) sRGB uint8 array to perceptual Oklab floats."""
+    linear = rgb.astype(np.float32) / 255
+    linear = np.where(linear <= 0.04045, linear / 12.92, ((linear + 0.055) / 1.055) ** 2.4)
+    lms = linear @ OKLAB_FROM_LINEAR.T
+    return np.cbrt(lms, out=lms) @ OKLAB_FROM_LMS_PRIME.T
+
+
 def quantize(reference: np.ndarray, colors: int):
-    image = Image.fromarray(reference).quantize(
-        colors, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE
-    )
-    labels = np.array(image)
-    palette = np.asarray(image.getpalette(), dtype=np.uint8).reshape(-1, 3)
-    return labels, palette
+    """Median-cut color quantization without dithering.
+
+    Splits happen in Oklab so bucket boundaries follow perceived color
+    differences; each palette entry is the sRGB mean of its bucket, and
+    pixels keep the bucket they were split into. Bucket bounds are tracked
+    incrementally, so a split only gathers one coordinate column.
+    """
+    height, width = reference.shape[:2]
+    flat = reference.reshape(-1, 3)
+    coordinates = oklab_of(flat)
+    labels = np.zeros(flat.shape[0], np.int32)
+    lo = coordinates.min(axis=0)
+    hi = coordinates.max(axis=0)
+    buckets = [[np.arange(flat.shape[0]), lo, hi]]
+    while True:
+        best = None
+        best_size = 1
+        for bucket in buckets:
+            members, low, high = bucket
+            if members.size > best_size and bool(((high - low) > 0).any()):
+                best, best_size = bucket, members.size
+        if best is None or len(buckets) >= colors:
+            break
+        members, low, high = best
+        axis = int(np.argmax(high - low))
+        column = coordinates[members, axis]
+        midpoint = np.float32((float(low[axis]) + float(high[axis])) / 2)
+        if not low[axis] < midpoint < high[axis]:
+            # The interval is exhausted at float32 precision: no representable
+            # cut remains, so retire the bucket instead of spinning.
+            high[axis] = low[axis]
+            continue
+        upper = members[column > midpoint]
+        if upper.size == 0:
+            # Bounds overshoot the real pixels; tighten and retry this bucket.
+            high[axis] = midpoint
+            continue
+        lower = members[column <= midpoint]
+        if lower.size == 0:
+            low[axis] = midpoint
+            continue
+        best[0] = lower
+        best[2] = high.copy()
+        best[2][axis] = midpoint
+        buckets.append([upper, low.copy(), high])
+        buckets[-1][1][axis] = midpoint
+        labels[upper] = len(buckets) - 1
+    palette = np.zeros((len(buckets), 3), np.float32)
+    for index, bucket in enumerate(buckets):
+        palette[index] = flat[bucket[0]].mean(axis=0)
+    return labels.reshape(height, width).astype(np.uint8), np.clip(np.rint(palette), 0, 255).astype(np.uint8)
 
 
 def label_components(labels):

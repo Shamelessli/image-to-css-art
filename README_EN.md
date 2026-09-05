@@ -35,7 +35,7 @@ This is an independent community tool. Conversion is lossy automatic contour tra
 <img src="docs/contour-study.png" alt="Self-made input test image: teal rings, a coral sphere, holes and thin lines" width="300">
 </div>
 
-The image above is a repository-made **input test image**; the [matching pure CSS output](docs/contour-study.html) can be downloaded and opened directly. It contains 277 contours, 48 underpainting shapes and 59 gradients; the HTML is about 472 kB. The image in this README is for illustration only — the generated HTML never references it.
+The image above is a repository-made **input test image**; the [matching pure CSS output](docs/contour-study.html) can be downloaded and opened directly. It contains 326 contours, 48 underpainting shapes and 98 gradients; the HTML is about 463 kB. The image in this README is for illustration only — the generated HTML never references it.
 
 ### Download v0.1.1
 
