@@ -39,17 +39,17 @@ This is an independent community tool. Conversion is lossy automatic contour tra
 
 The image above is a repository-made **input test image**; the [matching pure CSS output](docs/contour-study.html) can be downloaded and opened directly. It contains 326 contours, 48 underpainting shapes and 98 gradients; the HTML is about 463 kB. The image in this README is for illustration only — the generated HTML never references it.
 
-### Download v0.1.1
+### Download v0.2.0
 
 | File | Description |
 | --- | --- |
-| [image-to-css-art-0.1.1-plugin.zip](https://github.com/AvroraCL/image-to-css-art/releases/download/v0.1.1/image-to-css-art-0.1.1-plugin.zip) | Full plugin source package: manifest, skill, CLI, docs, example and tests |
-| [image-to-css-art-0.1.1-skill.zip](https://github.com/AvroraCL/image-to-css-art/releases/download/v0.1.1/image-to-css-art-0.1.1-skill.zip) | Standalone installable skill, including the conversion scripts and license |
-| [SHA256SUMS.txt](https://github.com/AvroraCL/image-to-css-art/releases/download/v0.1.1/SHA256SUMS.txt) | SHA-256 checksums for both archives |
+| [image-to-css-art-0.2.0-plugin.zip](https://github.com/AvroraCL/image-to-css-art/releases/download/v0.2.0/image-to-css-art-0.2.0-plugin.zip) | Full plugin source package: manifest, skill, CLI, docs, example and tests |
+| [image-to-css-art-0.2.0-skill.zip](https://github.com/AvroraCL/image-to-css-art/releases/download/v0.2.0/image-to-css-art-0.2.0-skill.zip) | Standalone installable skill, including the conversion scripts and license |
+| [SHA256SUMS.txt](https://github.com/AvroraCL/image-to-css-art/releases/download/v0.2.0/SHA256SUMS.txt) | SHA-256 checksums for both archives |
 
 Source code is also mirrored on [GitCode](https://gitcode.com/HelenaSG/image-to-css-art). The archives do not bundle Python or third-party dependencies.
 
-The archives above match the v0.1.1 tag. `--fit`, `--score` and Oklab quantization landed after that release; they are on main and usable from source, and will ship with the next release.
+The archives above match the v0.2.0 tag.
 
 ### Requirements
 

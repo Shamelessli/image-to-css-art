@@ -41,17 +41,17 @@ Image to CSS Art 是一个带有独立命令行工具的 AI Agent 技能（Skill
 
 上图是仓库自制的**输入测试图**；[对应的纯 CSS 成品](docs/contour-study.html) 下载后可直接打开。该例包含 326 个轮廓、48 个底色块和 98 处渐变，HTML 约 463 KB。README 中的图片仅用于说明，生成的 HTML 不引用它。
 
-### 下载 v0.1.1
+### 下载 v0.2.0
 
 | 文件 | 说明 |
 | --- | --- |
-| [image-to-css-art-0.1.1-plugin.zip](https://github.com/AvroraCL/image-to-css-art/releases/download/v0.1.1/image-to-css-art-0.1.1-plugin.zip) | 完整插件源包，含清单、Skill、CLI、文档、示例和测试 |
-| [image-to-css-art-0.1.1-skill.zip](https://github.com/AvroraCL/image-to-css-art/releases/download/v0.1.1/image-to-css-art-0.1.1-skill.zip) | 可单独安装的 Skill，已包含转换脚本与许可证 |
-| [SHA256SUMS.txt](https://github.com/AvroraCL/image-to-css-art/releases/download/v0.1.1/SHA256SUMS.txt) | 两个压缩包的 SHA-256 校验值 |
+| [image-to-css-art-0.2.0-plugin.zip](https://github.com/AvroraCL/image-to-css-art/releases/download/v0.2.0/image-to-css-art-0.2.0-plugin.zip) | 完整插件源包，含清单、Skill、CLI、文档、示例和测试 |
+| [image-to-css-art-0.2.0-skill.zip](https://github.com/AvroraCL/image-to-css-art/releases/download/v0.2.0/image-to-css-art-0.2.0-skill.zip) | 可单独安装的 Skill，已包含转换脚本与许可证 |
+| [SHA256SUMS.txt](https://github.com/AvroraCL/image-to-css-art/releases/download/v0.2.0/SHA256SUMS.txt) | 两个压缩包的 SHA-256 校验值 |
 
 源代码同步保存在 [GitCode](https://gitcode.com/HelenaSG/image-to-css-art)。压缩包不内置 Python 或第三方依赖。
 
-以上压缩包对应 v0.1.1 标签。`--fit`、`--score` 与 Oklab 量化是发布后的改进，已合入主线，可从源码直接使用，将随下一个版本发布。
+以上压缩包对应 v0.2.0 标签。
 
 ### 系统要求
 

@@ -32,4 +32,4 @@ class PackageTests(unittest.TestCase):
             # -S disables all third-party site packages: audit/help remains portable.
             result = subprocess.run([sys.executable, "-S", str(cli), "--version"], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(result.stdout.strip(), "0.1.1")
+            self.assertEqual(result.stdout.strip(), "0.2.0")
