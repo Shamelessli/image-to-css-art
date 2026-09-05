@@ -6,7 +6,12 @@ import numpy as np
 
 def number(value, digits=3):
     text = f"{value:.{digits}f}".rstrip("0").rstrip(".")
-    return "0" if text in ("", "-0") else text
+    # A leading zero is legal to drop in CSS numbers and saves a byte per value.
+    if text.startswith("0."):
+        text = text[1:]
+    elif text.startswith("-0."):
+        text = "-" + text[2:]
+    return "0" if text in ("", "-0", "-.") else text
 
 
 def hex_color(rgb):

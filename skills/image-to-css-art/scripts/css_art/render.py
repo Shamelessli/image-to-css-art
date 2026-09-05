@@ -51,6 +51,7 @@ class ContourRenderer:
         self.gradients = gradients
         self.max_bytes = max_bytes
         self.byte_count = 0
+        self.paint_classes = {}
         self.stats = {"shapes": 0, "gradient_fills": 0, "polygon_vertices": 0, "interior_holes": 0, "underpainting_shapes": 0}
 
     def account(self, text):
@@ -59,6 +60,12 @@ class ContourRenderer:
             raise ValueError("HTML exceeds --max-output-mb; reduce --max-width/--colors or raise the limit.")
         return text
 
+    def solid_class(self, paint):
+        """Share one CSS class between every shape painted the same solid color."""
+        if paint not in self.paint_classes:
+            self.paint_classes[paint] = f"p{len(self.paint_classes)}"
+        return self.paint_classes[paint]
+
     def shape(self, rings, paint):
         all_points = np.concatenate(rings)
         origin = all_points.min(axis=0)
@@ -66,15 +73,25 @@ class ContourRenderer:
         if np.any(size <= 0):
             return None
         points = bridge_rings(rings)
-        clip = polygon_css(points, origin, size, len(rings) > 1)
+        # Two decimals already bound the error to size/10000 px; only vast
+        # shapes earn a third decimal. That stays under ~0.1 px, far below
+        # the tracing grid and visible antialiasing.
+        digits = max(2, math.ceil(math.log10(max(size) / 10)))
+        clip = polygon_css(points, origin, size, len(rings) > 1, digits)
+        cls = "shape"
+        background = ""
+        if paint.startswith("#"):
+            cls = f"shape {self.solid_class(paint)}"
+        else:
+            background = f"background:{paint};"
         style = (
-            f"left:{number(origin[0] / self.width * 100, 5)}%;top:{number(origin[1] / self.height * 100, 5)}%;"
-            f"width:{number(size[0] / self.width * 100, 5)}%;height:{number(size[1] / self.height * 100, 5)}%;"
-            f"background:{paint};clip-path:{clip}"
+            f"left:{number(origin[0] / self.width * 100, 3)}%;top:{number(origin[1] / self.height * 100, 3)}%;"
+            f"width:{number(size[0] / self.width * 100, 3)}%;height:{number(size[1] / self.height * 100, 3)}%;"
+            f"{background}clip-path:{clip}"
         )
         self.stats["shapes"] += 1
         self.stats["polygon_vertices"] += len(points)
-        return self.account(f'<div class="shape" style="{style}"></div>')
+        return self.account(f'<div class="{cls}" style="{style}"></div>')
 
     def foreground(self, labels, palette, progress):
         parts = []
@@ -149,6 +166,7 @@ def render_document(reference, labels, palette, original_size, *, background, ti
     width, height = original_size
     matte = hex_color(background)
     label = html.escape(title, quote=True)
+    paints = "".join(f".{name}{{background:{paint}}}" for paint, name in renderer.paint_classes.items())
     document = f'''<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -162,6 +180,7 @@ html,body{{margin:0;min-height:100%;background:{matte}}}
 .illustration{{position:relative;isolation:isolate;overflow:hidden;width:min(100%,{renderer.width}px);aspect-ratio:{width}/{height};margin:0 auto;background:{matte};contain:layout paint}}
 .shape{{position:absolute;pointer-events:none}}
 .underpainting{{position:absolute;inset:0;pointer-events:none}}
+{paints}
 @media print{{@page{{margin:0}}.illustration{{width:100%;print-color-adjust:exact;-webkit-print-color-adjust:exact}}}}
 </style>
 </head>

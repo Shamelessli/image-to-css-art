@@ -37,7 +37,7 @@ Image to CSS Art 是一个带有独立命令行工具的 AI Agent 技能（Skill
 <img src="docs/contour-study.png" alt="自制输入测试图：青绿环带、珊瑚色球体、孔洞与细线" width="300">
 </div>
 
-上图是仓库自制的**输入测试图**；[对应的纯 CSS 成品](docs/contour-study.html) 下载后可直接打开。该例包含 317 个轮廓和 59 处渐变，HTML 约 471 KiB。README 中的图片仅用于说明，生成的 HTML 不引用它。
+上图是仓库自制的**输入测试图**；[对应的纯 CSS 成品](docs/contour-study.html) 下载后可直接打开。该例包含 277 个轮廓、48 个底色块和 59 处渐变，HTML 约 472 KB。README 中的图片仅用于说明，生成的 HTML 不引用它。
 
 ### 下载 v0.1.1
 

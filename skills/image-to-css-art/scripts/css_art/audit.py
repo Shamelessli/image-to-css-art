@@ -49,10 +49,15 @@ class ContractParser(HTMLParser):
                 self.errors.append("Only the Content-Security-Policy http-equiv is permitted")
         if tag == "main":
             self.mains += 1
-        if tag == "div" and values.get("class") == "shape":
-            self.shapes += 1
-            if "clip-path:polygon(" not in values.get("style", ""):
-                self.errors.append("Shape lacks a CSS polygon")
+        if tag == "div":
+            classes = (values.get("class") or "").split()
+            for token in classes:
+                if not re.fullmatch(r"shape|underpainting|p\d+", token):
+                    self.errors.append(f"Unexpected class token: {token}")
+            if "shape" in classes:
+                self.shapes += 1
+                if "clip-path:polygon(" not in values.get("style", ""):
+                    self.errors.append("Shape lacks a CSS polygon")
         if tag not in VOID:
             self.stack.append(tag)
 
