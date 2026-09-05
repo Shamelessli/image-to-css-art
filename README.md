@@ -92,6 +92,7 @@ Linux/macOS 使用 `.venv/bin/python`。转换完成后直接在浏览器打开 
 | `--background '#faf8f2'` | 指定页面底色与透明区域的合成色 |
 | `--title "画面描述"` | 设置标题及无障碍描述，按纯文本转义 |
 | `--max-output-mb 32` | HTML 体积预算，单位 MiB，默认 64 |
+| `--fit 20` | 目标体积（MiB）：自动逐档降低宽度/颜色直到装得下 |
 | `--report .work/report.json` | 写入轮廓数、渐变数、依赖版本及 SHA-256 |
 | `--no-gradients` / `--no-underpainting` | 关闭局部渐变 / 防接缝底色 |
 | `--score` | 离线栅格化并与参考图对比，在报告中写入 MAE 差异度 |

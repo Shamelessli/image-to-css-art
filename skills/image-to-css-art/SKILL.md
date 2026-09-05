@@ -60,7 +60,8 @@ visual similarity. Do not add JavaScript to the deliverable for preview or valid
 
 If color seams appear at small sizes, keep underpainting enabled. If subtle marks disappear,
 increase trace width/colors before weakening region merging. If output exceeds the agreed
-size budget, use `balanced` or reduce `--max-width`; do not fall back to embedded image data.
+size budget, pass `--fit <MiB>` to step down width/colors automatically, or use `balanced`
+or reduce `--max-width` yourself; do not fall back to embedded image data.
 Read [tuning.md](references/tuning.md) for parameters and the algorithm's limits.
 
 Finish with the actual HTML link, size and meaningful verification results. Describe any

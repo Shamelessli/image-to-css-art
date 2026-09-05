@@ -43,6 +43,14 @@ def same_as_matte(rgb, background):
     return int(np.abs(rgb.astype(np.int16) - background).max()) <= 3
 
 
+class BudgetExceeded(ValueError):
+    """Raised while rendering when the document passes its byte budget."""
+
+    def __init__(self, byte_count):
+        super().__init__("HTML exceeds --max-output-mb; reduce --max-width/--colors, raise the limit, or use --fit.")
+        self.byte_count = byte_count
+
+
 class ContourRenderer:
     def __init__(self, reference, background, epsilon, gradients, max_bytes, score=False):
         self.reference = reference
@@ -59,7 +67,7 @@ class ContourRenderer:
     def account(self, text):
         self.byte_count += len(text.encode("utf-8"))
         if self.byte_count > self.max_bytes:
-            raise ValueError("HTML exceeds --max-output-mb; reduce --max-width/--colors or raise the limit.")
+            raise BudgetExceeded(self.byte_count)
         return text
 
     def solid_class(self, paint):
@@ -201,7 +209,7 @@ html,body{{margin:0;min-height:100%;background:{matte}}}
 </html>
 '''
     if len(document.encode("utf-8")) > max_bytes:
-        raise ValueError("HTML exceeds --max-output-mb; reduce --max-width/--colors or raise the limit.")
+        raise BudgetExceeded(len(document.encode("utf-8")))
     if renderer.raster is not None:
         detail, thumbnail = renderer.raster.errors(reference)
         renderer.stats["similarity"] = {"mae": detail, "mae_thumbnail": thumbnail}

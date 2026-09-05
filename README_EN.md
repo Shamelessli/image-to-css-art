@@ -91,6 +91,7 @@ Common options:
 | `--background '#faf8f2'` | Page matte and compositing color for transparent areas |
 | `--title "Scene description"` | Sets the title and accessible description, escaped as plain text |
 | `--max-output-mb 32` | HTML size budget in MiB, defaults to 64 |
+| `--fit 20` | Target size in MiB: automatically steps down width/colors until the HTML fits |
 | `--report .work/report.json` | Writes contour count, gradient count, dependency versions and SHA-256 |
 | `--no-gradients` / `--no-underpainting` | Disable local gradients / the anti-seam underpainting |
 | `--score` | Rasterize the shapes offline and report MAE against the reference |

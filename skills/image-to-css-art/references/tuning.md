@@ -10,6 +10,11 @@ No upscaling is applied. The longest edge is also capped at twice the selected w
 `--max-width` accepts 1–2400; `--colors` accepts 2–256. Default output budget is 64 MiB;
 `--max-output-mb` can change it. The budget is checked while accumulating shapes and again
 before writing the final document. It is not a limit on peak RAM or computation time.
+`--fit <MiB>` targets a size instead of failing at one: each attempt is a full render, and
+the ladder deterministically steps width down by quarters to 512, then shrinks the palette
+toward 256/64 width floors. Typical searches cost one extra render per halving; the report
+records every attempt under `fit`, where failed attempts set `exceeded` and their `bytes`
+mark the point where the budget tripped.
 
 ## Pipeline
 

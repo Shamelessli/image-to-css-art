@@ -168,6 +168,26 @@ class PipelineTests(unittest.TestCase):
             self.assertTrue(np.array_equal(boxes, np.asarray(expected_boxes, dtype=np.int32)[mapping[:len(boxes)]]), trial)
             self.assertTrue(np.allclose(centers, np.asarray(expected_centers, dtype=np.float64)[mapping[:len(centers)]], atol=1e-9), trial)
 
+    def test_fit_steps_down_until_the_output_fits(self):
+        values = np.linspace(20, 230, 128).astype(np.uint8)
+        array = np.empty((64, 128, 3), np.uint8)
+        array[:] = np.stack((values, values, np.full(128, 170)), axis=1)
+        _, plain = self.convert(Image.fromarray(array), "--colors", "8")
+        target_mb = plain["bytes"] * 0.85 / 1024 / 1024
+        _, fitted = self.convert(Image.fromarray(array), "--colors", "8", "--fit", f"{target_mb:.6f}", "--force")
+        self.assertLessEqual(fitted["bytes"], int(target_mb * 1024 * 1024))
+        self.assertLess(fitted["settings"]["colors"], 8)
+        self.assertGreaterEqual(len(fitted["fit"]["attempts"]), 2)
+        self.assertTrue(fitted["audit"]["valid"])
+
+    def test_fit_reports_a_clear_error_when_impossible(self):
+        source, output = self.root / "in.png", self.root / "out.html"
+        Image.new("RGB", (32, 32), "red").save(source)
+        status, _, stderr = self.run_cli("convert", source, "-o", output, "--fit", ".0004", "--quiet")
+        self.assertEqual(status, 1)
+        self.assertFalse(output.exists())
+        self.assertIn("Cannot fit", stderr)
+
     def test_no_overwrite_or_partial_file_when_budget_exceeded(self):
         source, output = self.root / "in.png", self.root / "out.html"
         Image.new("RGB", (16, 16), "red").save(source)

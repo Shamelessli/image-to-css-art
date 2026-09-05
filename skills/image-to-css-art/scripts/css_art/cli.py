@@ -59,6 +59,7 @@ def build_parser():
     convert.add_argument("--no-gradients", action="store_true")
     convert.add_argument("--no-underpainting", action="store_true")
     convert.add_argument("--max-output-mb", type=positive_float, default=64, help="HTML size budget in MiB (default 64)")
+    convert.add_argument("--fit", type=positive_float, help="Target size in MiB; automatically step down width/colors until the HTML fits")
     convert.add_argument("--score", action="store_true", help="Rasterize the shapes offline and report MAE against the reference")
     convert.add_argument("--report", type=Path, help="Optional machine-readable JSON report")
     convert.add_argument("--force", action="store_true", help="Replace existing output/report files")
@@ -107,13 +108,25 @@ def atomic_write(path: Path, text: str, force: bool):
             temporary.unlink(missing_ok=True)
 
 
+def fit_candidates(config):
+    """Deterministic fallback ladder: shrink width first, then the palette."""
+    width, colors = config["max_width"], config["colors"]
+    yield dict(config)
+    while width > 512:
+        width = max(512, round(width * 3 / 4 / 4) * 4)
+        yield {**config, "max_width": width}
+    for width_floor, divisor in ((512, 2), (384, 4), (300, 8), (256, 16)):
+        shrunk = max(2, min(colors, colors // divisor))
+        yield {**config, "max_width": min(config["max_width"], width_floor), "colors": shrunk}
+
+
 def convert(args):
     check_paths(args.input, args.output, args.report, args.force)
     import cv2
     import numpy as np
     from PIL import __version__ as pillow_version
     from .regions import load_reference, merge_regions, quantize
-    from .render import render_document
+    from .render import BudgetExceeded, render_document
 
     cv2.setNumThreads(1)
     cv2.setRNGSeed(0)
@@ -123,19 +136,48 @@ def convert(args):
         if getattr(args, name) is not None:
             config[name] = getattr(args, name)
     progress = (lambda _: None) if args.quiet else (lambda message: print(message, file=sys.stderr, flush=True))
-    reference, original = load_reference(args.input, config["max_width"], args.background)
-    progress(f"Trace canvas: {reference.shape[1]} x {reference.shape[0]}; palette: {config['colors']}")
-    labels, palette = quantize(reference, config["colors"])
-    labels = merge_regions(labels, palette, config["passes"], progress)
-    document, stats = render_document(
-        reference, labels, palette, original, background=args.background, title=args.title,
-        epsilon=config["epsilon"], gradients=not args.no_gradients,
-        underpainting=not args.no_underpainting,
-        max_bytes=int(args.max_output_mb * 1024 * 1024), progress=progress, score=args.score,
-    )
+    limit = int(args.max_output_mb * 1024 * 1024)
+    target = limit if args.fit is None else min(limit, int(args.fit * 1024 * 1024))
+    attempts = []
+    document = stats = reference = original = None
+    last = dict(config)
+    previous = None
+    candidates = fit_candidates(config) if args.fit is not None else iter((dict(config),))
+    for candidate in candidates:
+        key = (candidate["max_width"], candidate["colors"])
+        if key == previous:
+            continue
+        previous = key
+        last = candidate
+        reference, original = load_reference(args.input, candidate["max_width"], args.background)
+        labels, palette = quantize(reference, candidate["colors"])
+        labels = merge_regions(labels, palette, candidate["passes"], progress)
+        try:
+            document, stats = render_document(
+                reference, labels, palette, original, background=args.background, title=args.title,
+                epsilon=candidate["epsilon"], gradients=not args.no_gradients,
+                underpainting=not args.no_underpainting,
+                max_bytes=target, progress=progress, score=args.score,
+            )
+        except BudgetExceeded as exceeded:
+            if args.fit is None:
+                raise
+            attempts.append({"max_width": candidate["max_width"], "colors": candidate["colors"],
+                             "bytes": exceeded.byte_count, "exceeded": True})
+            progress(f"Fit attempt {len(attempts)}: width {candidate['max_width']}, colors "
+                     f"{candidate['colors']} exceeded the target; stepping down")
+            continue
+        audit = audit_html(document)
+        if not audit["valid"]:
+            raise ValueError("Generated HTML failed audit: " + "; ".join(audit["errors"]))
+        attempts.append({"max_width": candidate["max_width"], "colors": candidate["colors"],
+                         "bytes": audit["bytes"]})
+        config = candidate
+        break
+    else:
+        raise ValueError(f"Cannot fit the illustration within {target / 1024 / 1024:.2f} MiB even at "
+                         f"width {last['max_width']} and {last['colors']} colors; raise --fit/--max-output-mb.")
     audit = audit_html(document)
-    if not audit["valid"]:
-        raise ValueError("Generated HTML failed audit: " + "; ".join(audit["errors"]))
     report = {
         "version": __version__, "preset": args.preset, "settings": config,
         "original_size": list(original), "trace_size": list(reference.shape[1::-1]),
@@ -143,6 +185,8 @@ def convert(args):
         "audit": audit, "seconds": round(time.perf_counter() - start, 3),
         "dependencies": {"numpy": np.__version__, "opencv": cv2.__version__, "pillow": pillow_version},
     }
+    if args.fit is not None:
+        report["fit"] = {"target_mb": args.fit, "attempts": attempts}
     atomic_write(args.output, document, args.force)
     if args.report:
         atomic_write(args.report, json.dumps(report, ensure_ascii=False, indent=2) + "\n", args.force)
