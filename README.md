@@ -10,11 +10,13 @@
 
 **把参考图片描摹成可直接打开的纯 HTML + CSS 插画。**
 
+欢迎路过盒U
+
 [GitHub](https://github.com/AvroraCL/image-to-css-art) · [GitCode](https://gitcode.com/HelenaSG/image-to-css-art) · [下载](https://github.com/AvroraCL/image-to-css-art/releases)
 
 </div>
 
-Image to CSS Art 是一个带有独立命令行工具的 Codex 插件。它在本地完成颜色分区、轮廓提取与渐变拟合，将参考图转换成大量 HTML 元素和 CSS 多边形。打开成品时无需 Python、图片文件或网络连接。
+Image to CSS Art 是一个带有独立命令行工具的 AI Agent 技能（Skill）。任何能加载 Agent Skills 并执行本地命令的 AI 编程助手（Codex、Claude Code 等）都可以使用它，不需要任何 Agent 时也能直接用命令行调用。它在本地完成颜色分区、轮廓提取与渐变拟合，将参考图转换成大量 HTML 元素和 CSS 多边形。打开成品时无需 Python、图片文件或网络连接。
 
 项目是独立社区工具。转换属于有损的自动轮廓描摹，生成的图层按颜色与轮廓组织；不会把人物自动拆成可语义编辑的头发、眼睛或服装组件。
 
@@ -53,9 +55,9 @@ Image to CSS Art 是一个带有独立命令行工具的 Codex 插件。它在�
 - 查看时：支持 CSS 多边形偶奇填充、渐变和 `aspect-ratio` 的浏览器。
 - 本地主要在 Windows + Python 3.12 + Chromium 验证，CI 覆盖 Windows / Linux 和 Python 3.10 / 3.12。
 
-### 在 Codex 中使用
+### 在 AI Agent 中使用
 
-下载并解压 Skill 包，把 `image-to-css-art` 整个目录放进个人 `~/.agents/skills/`，或项目的 `.agents/skills/`。也可以让 `$skill-installer` 从本仓库的 `skills/image-to-css-art` 安装。加载方式见 [OpenAI 的 Skill 文档](https://learn.chatgpt.com/docs/build-skills)。
+任何支持 Agent Skills 格式的 AI 编程助手都能加载本技能：下载并解压 Skill 包，把 `image-to-css-art` 整个目录放进个人 `~/.agents/skills/`，或项目的 `.agents/skills/`，然后直接用自然语言让 Agent 调用即可。Codex 用户也可以让 `$skill-installer` 从本仓库的 `skills/image-to-css-art` 安装，加载方式见 [OpenAI 的 Skill 文档](https://learn.chatgpt.com/docs/build-skills)。
 
 安装后提供参考图片并输入：
 
