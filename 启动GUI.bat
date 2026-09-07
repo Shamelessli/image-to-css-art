@@ -1,7 +1,7 @@
-ï»¿@echo off
+@echo off
 cd /d "%~dp0"
 if not exist ".venv\Scripts\python.exe" (
-    echo æœªæ‰¾åˆ° .venv è™šæ‹Ÿç¯å¢ƒï¼Œè¯·å…ˆåœ¨é¡¹ç›®ç›®å½•æ‰§è¡Œï¼š
+    echo Î´ÕÒµ½ .venv ĞéÄâ»·¾³£¬ÇëÏÈÔÚÏîÄ¿Ä¿Â¼Ö´ĞĞ£º
     echo     python -m venv .venv
     pause
     exit /b 1
