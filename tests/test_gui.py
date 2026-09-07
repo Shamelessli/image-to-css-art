@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from gui import parse_dnd_data, resolve_output_names, scan_images
+from gui import parse_dnd_data, resolve_output_names, scan_images, worker_tag
 
 
 class OutputNameTests(unittest.TestCase):
@@ -67,6 +67,12 @@ class ParseDndDataTests(unittest.TestCase):
 
     def test_empty_items_skipped(self):
         self.assertEqual(parse_dnd_data("  a.png  "), ["a.png"])
+
+
+class WorkerTagTests(unittest.TestCase):
+    def test_format(self):
+        self.assertEqual(worker_tag(1), "[W1]")
+        self.assertEqual(worker_tag(12), "[W12]")
 
 
 if __name__ == "__main__":

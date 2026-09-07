@@ -77,6 +77,11 @@ def parse_dnd_data(raw):
     return [x for x in items if x]
 
 
+def worker_tag(n):
+    """工作线程日志前缀。"""
+    return f"[W{n}]"
+
+
 class App:
     def __init__(self, root):
         self.root = root
@@ -115,21 +120,25 @@ class App:
         ttk.Label(frm, text="目标体积 MiB（可选）").grid(row=4, column=0, sticky=tk.W)
         self.fit = ttk.Entry(frm, width=10)
         self.fit.grid(row=4, column=1, sticky=tk.W)
-        ttk.Label(frm, text="输出目录（留空=与输入同目录）").grid(row=5, column=0, sticky=tk.W)
+        ttk.Label(frm, text="并行数(高并行有内存风险)").grid(row=5, column=0, sticky=tk.W)
+        self.par = ttk.Spinbox(frm, from_=1, to=16, width=8)
+        self.par.set(2)
+        self.par.grid(row=5, column=1, sticky=tk.W)
+        ttk.Label(frm, text="输出目录（留空=与输入同目录）").grid(row=6, column=0, sticky=tk.W)
         self.outdir = ttk.Entry(frm)
-        self.outdir.grid(row=5, column=1, columnspan=2, sticky=tk.EW)
-        ttk.Button(frm, text="浏览", command=self._browse).grid(row=5, column=3, sticky=tk.W)
+        self.outdir.grid(row=6, column=1, columnspan=2, sticky=tk.EW)
+        ttk.Button(frm, text="浏览", command=self._browse).grid(row=6, column=3, sticky=tk.W)
         self.start = ttk.Button(frm, text="开始转换", command=self._start)
-        self.start.grid(row=6, column=0, columnspan=4, sticky=tk.EW)
-        ttk.Button(frm, text="打开输出文件夹", command=self._open_dir).grid(row=7, column=0, columnspan=4, sticky=tk.EW)
-        ttk.Label(frm, text="日志").grid(row=8, column=0, columnspan=4, sticky=tk.W)
+        self.start.grid(row=7, column=0, columnspan=4, sticky=tk.EW)
+        ttk.Button(frm, text="打开输出文件夹", command=self._open_dir).grid(row=8, column=0, columnspan=4, sticky=tk.EW)
+        ttk.Label(frm, text="日志").grid(row=9, column=0, columnspan=4, sticky=tk.W)
         self.log = tk.Text(frm, height=12, state=tk.DISABLED, wrap=tk.NONE)
-        self.log.grid(row=9, column=0, columnspan=4, sticky=tk.NSEW)
+        self.log.grid(row=10, column=0, columnspan=4, sticky=tk.NSEW)
         lsb = ttk.Scrollbar(frm, orient=tk.VERTICAL, command=self.log.yview)
-        lsb.grid(row=9, column=4, sticky=tk.NS)
+        lsb.grid(row=10, column=4, sticky=tk.NS)
         self.log.configure(yscrollcommand=lsb.set)
         frm.rowconfigure(1, weight=1)
-        frm.rowconfigure(9, weight=2)
+        frm.rowconfigure(10, weight=2)
         frm.columnconfigure(1, weight=1)
 
     def _add(self):
@@ -221,16 +230,43 @@ class App:
         outdir = Path(self.outdir.get().strip()) if self.outdir.get().strip() else None
         tasks = [(src, (outdir if outdir else src.parent) / name)
                  for src, name in zip(self.files, resolve_output_names(self.files))]
+        try:
+            n = int(self.par.get())
+        except ValueError:
+            n = 2
+        n = max(1, min(16, n))
         self.busy = True
         self.start.state(["disabled"])
-        threading.Thread(target=self._worker, args=(tasks,), daemon=True).start()
+        self.par.state(["disabled"])
+        threading.Thread(target=self._supervise, args=(tasks, n), daemon=True).start()
 
-    def _worker(self, tasks):
+    def _supervise(self, tasks, n):
+        q = queue.Queue()
+        ok = []
+        for task in tasks:
+            q.put(task)
+        for _ in range(n):
+            q.put(None)
+        workers = [threading.Thread(target=self._worker, args=(q, i + 1, ok), daemon=True)
+                   for i in range(n)]
+        for w in workers:
+            w.start()
+        for w in workers:
+            w.join()
+        self._put(f"全部完成 (成功 {len(ok)}/{len(tasks)})")
+        self.queue.put(None)
+
+    def _worker(self, q, idx, ok):
+        tag = worker_tag(idx)
         preset = self.preset.get()
         bg = self.bg.get().strip()
         fit = self.fit.get().strip()
-        for src, out in tasks:
-            self._put(f"=== 转换: {src.name}")
+        while True:
+            item = q.get()
+            if item is None:
+                return
+            src, out = item
+            self._put(f"{tag} === 转换: {src.name}")
             cmd = [str(VENV_PY), str(CLI), "convert", str(src), "-o", str(out), "--preset", preset, "--force"]
             if bg:
                 cmd += ["--background", bg]
@@ -239,12 +275,15 @@ class App:
             try:
                 proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", bufsize=1)
                 for line in proc.stdout:
-                    self._put(line.rstrip())
+                    self._put(f"{tag} {line.rstrip()}")
                 proc.wait()
-                self._put(f"OK → {out}" if proc.returncode == 0 else f"失败（退出码 {proc.returncode}）")
+                if proc.returncode == 0:
+                    ok.append(src)
+                    self._put(f"{tag} OK → {out}")
+                else:
+                    self._put(f"{tag} 失败（退出码 {proc.returncode}）")
             except OSError as exc:
-                self._put(f"无法启动转换进程: {exc}")
-        self.queue.put(None)
+                self._put(f"{tag} 无法启动转换进程: {exc}")
 
     def _put(self, line):
         self.queue.put(line)
@@ -256,6 +295,7 @@ class App:
                 if item is None:
                     self.busy = False
                     self.start.state(["!disabled"])
+                    self.par.state(["!disabled"])
                 else:
                     self._log(item)
         except queue.Empty:
