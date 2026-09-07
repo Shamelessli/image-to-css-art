@@ -8,6 +8,12 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+try:
+    from tkinterdnd2 import DND_FILES, TkinterDnD
+except ImportError:
+    DND_FILES = None
+    TkinterDnD = None
+
 ROOT = Path(__file__).resolve().parent
 VENV_PY = ROOT / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 CLI = ROOT / "skills/image-to-css-art/scripts/image_to_css.py"
@@ -25,6 +31,50 @@ def resolve_output_names(sources):
         used.add(name)
         names.append(name)
     return names
+
+
+IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".webp", ".gif"}
+
+
+def scan_images(paths):
+    """文件或目录混合列表 -> 顶层图片文件去重列表。"""
+    found = []
+    for p in paths:
+        p = Path(p)
+        if p.is_dir():
+            found.extend(f for f in p.iterdir()
+                         if f.is_file() and f.suffix.lower() in IMAGE_EXTS)
+        elif p.is_file() and p.suffix.lower() in IMAGE_EXTS:
+            found.append(p)
+    result, seen = [], set()
+    for f in found:
+        key = f.resolve()
+        if key not in seen:
+            seen.add(key)
+            result.append(f)
+    return result
+
+
+def parse_dnd_data(raw):
+    """tkdnd 拖拽数据 -> 路径列表（处理 {花括号} 包裹的空格路径）。"""
+    items, i = [], 0
+    while i < len(raw):
+        if raw[i] == "{":
+            end = raw.find("}", i + 1)
+            if end == -1:
+                break
+            items.append(raw[i + 1:end])
+            i = end + 1
+        else:
+            end = raw.find(" ", i)
+            if end == -1:
+                items.append(raw[i:])
+                break
+            items.append(raw[i:end])
+            i = end
+        while i < len(raw) and raw[i] == " ":
+            i += 1
+    return [x for x in items if x]
 
 
 class App:
@@ -48,6 +98,9 @@ class App:
         sb = ttk.Scrollbar(frm, orient=tk.VERTICAL, command=self.listbox.yview)
         sb.grid(row=1, column=4, sticky=tk.NS)
         self.listbox.configure(yscrollcommand=sb.set)
+        if TkinterDnD:
+            self.listbox.drop_target_register(DND_FILES)
+            self.listbox.dnd_bind("<<Drop>>", self._on_drop)
         ttk.Button(frm, text="添加图片", command=self._add).grid(row=2, column=0, sticky=tk.W)
         ttk.Button(frm, text="移除选中", command=self._remove).grid(row=2, column=1, sticky=tk.W)
         ttk.Button(frm, text="清空", command=self._clear).grid(row=2, column=2, sticky=tk.W)
@@ -88,6 +141,11 @@ class App:
             p = Path(p).resolve()
             if p not in self.files:
                 self.files.append(p)
+        self._refresh_list()
+
+    def _on_drop(self, event):
+        self.files.extend(p for p in scan_images([Path(x) for x in parse_dnd_data(event.data)])
+                          if p not in self.files)
         self._refresh_list()
 
     def _remove(self):
@@ -131,8 +189,8 @@ class App:
             messagebox.showerror("错误", f"未找到转换脚本: {CLI}")
             self.start.state(["disabled"])
             return
-        if subprocess.run([str(VENV_PY), "-c", "import numpy, cv2, PIL"], capture_output=True).returncode != 0:
-            if messagebox.askyesno("缺少依赖", "虚拟环境缺少 numpy / OpenCV / Pillow。\n现在自动安装吗？（需要联网）"):
+        if subprocess.run([str(VENV_PY), "-c", "import numpy, cv2, PIL, tkinterdnd2"], capture_output=True).returncode != 0:
+            if messagebox.askyesno("缺少依赖", "虚拟环境缺少 numpy / OpenCV / Pillow / tkinterdnd2。\n现在自动安装吗？（需要联网）"):
                 self._install_deps()
 
     def _install_deps(self):
@@ -147,7 +205,7 @@ class App:
                 self._put("ensurepip 失败，请手动安装依赖")
                 return
             self._put("安装依赖（pip install -r requirements.txt）...")
-            r = subprocess.run([str(VENV_PY), "-m", "pip", "install", "-r", str(REQ)], capture_output=True, text=True, encoding="utf-8", errors="replace")
+            r = subprocess.run([str(VENV_PY), "-m", "pip", "install", "-r", str(REQ), "tkinterdnd2"], capture_output=True, text=True, encoding="utf-8", errors="replace")
             if r.stdout.strip():
                 self._put(r.stdout.strip())
             if r.stderr.strip():
@@ -212,7 +270,7 @@ class App:
 
 
 def main():
-    root = tk.Tk()
+    root = (TkinterDnD.Tk() if TkinterDnD else tk.Tk())
     App(root)
     root.mainloop()
 

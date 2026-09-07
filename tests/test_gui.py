@@ -1,9 +1,10 @@
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from gui import resolve_output_names
+from gui import parse_dnd_data, resolve_output_names, scan_images
 
 
 class OutputNameTests(unittest.TestCase):
@@ -19,6 +20,53 @@ class OutputNameTests(unittest.TestCase):
 
     def test_leading_space_kept(self):
         self.assertEqual(resolve_output_names([Path(" (1).jpg")]), [" (1).html"])
+
+
+IMAGE_EXTS_TEST = {".png", ".jpg", ".jpeg", ".bmp", ".webp", ".gif"}
+
+
+class ScanImagesTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        (self.root / "a.png").write_bytes(b"x")
+        (self.root / "b.JPG").write_bytes(b"x")
+        (self.root / "c.txt").write_bytes(b"x")
+        (self.root / "sub").mkdir()
+        (self.root / "sub" / "d.png").write_bytes(b"x")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_mixed_files_and_dir_top_level_only(self):
+        result = scan_images([self.root / "a.png", self.root / "c.txt", self.root])
+        self.assertEqual(result, [self.root / "a.png", self.root / "b.JPG"])
+
+    def test_dir_does_not_recurse(self):
+        result = scan_images([self.root])
+        self.assertNotIn(self.root / "sub" / "d.png", result)
+
+    def test_duplicates_removed(self):
+        result = scan_images([self.root / "a.png", self.root / "a.png"])
+        self.assertEqual(result, [self.root / "a.png"])
+
+    def test_case_insensitive_extensions(self):
+        result = scan_images([self.root / "b.JPG"])
+        self.assertEqual(result, [self.root / "b.JPG"])
+
+
+class ParseDndDataTests(unittest.TestCase):
+    def test_simple_paths(self):
+        self.assertEqual(parse_dnd_data("a.png b.jpg"), ["a.png", "b.jpg"])
+
+    def test_braced_paths_with_spaces(self):
+        self.assertEqual(parse_dnd_data(r"{my folder\a.png} {b.jpg}"), [r"my folder\a.png", "b.jpg"])
+
+    def test_adjacent_braces(self):
+        self.assertEqual(parse_dnd_data(r"{x y}{z}"), ["x y", "z"])
+
+    def test_empty_items_skipped(self):
+        self.assertEqual(parse_dnd_data("  a.png  "), ["a.png"])
 
 
 if __name__ == "__main__":
