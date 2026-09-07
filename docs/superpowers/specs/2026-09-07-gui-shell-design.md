@@ -67,3 +67,40 @@
 - 不暴露全部 CLI 参数（仅预设/背景色/fit）
 - 不做转换后自动打开浏览器
 - 不打包为 exe（体积优先，bat 启动足够）
+
+---
+
+## 增量设计（2026-09-07 追加）：拖拽 + 并行 + 日志分块
+
+用户批准的新增功能，叠加在原设计之上。原约束不变，仅以下条目被覆盖。
+
+### 变更的约束
+
+- gui.py 体积预算：<10 KB → **<16 KB**
+- GUI 新增唯一第三方依赖 **tkinterdnd2**（仅装进项目 venv，约 1.5MB；不影响成品 HTML；不影响转换依赖 requirements.txt）
+- 依赖探测范围：numpy/cv2/PIL + tkinterdnd2；一键安装命令 = `pip install -r requirements.txt tkinterdnd2`
+
+### 功能 1：拖拽添加
+
+- 根窗口改为 `TkinterDnD.Tk()`；图片列表 Listbox 注册 `drop_target_register(DND_FILES)` + `<<Drop>>` 事件
+- 拖入文件：追加到列表，按解析后路径去重（与「添加图片」按钮行为一致）
+- 拖入文件夹：仅收集**顶层**图片文件（扩展名 .png/.jpg/.jpeg/.bmp/.webp/.gif），不递归
+- 纯函数 `scan_images(paths) -> list[Path]`：接受文件或目录路径混合列表，返回去重后的图片文件列表（目录只扫顶层）。此函数可单测
+- tkinterdnd2 缺失时：GUI 其余功能不受影响，拖拽不可用并弹提示
+
+### 功能 2：并行处理
+
+- 「并行数」Spinbox 1–16，默认 2；转换期间 disabled，结束后恢复
+- worker 架构：任务队列 `queue.Queue` + N 个 daemon worker 线程；每个 worker 循环 `get_nowait` 取任务，起 subprocess 转换（进程隔离不变）
+- 队列预放 N 个 sentinel（每 worker 一个），worker 取到即退出；全部 worker 退出后日志输出 `全部完成 (成功 S/总数 T)`（S=退出码 0 的文件数，T=任务总数）
+- 并行放大内存峰值：faithful 大图单进程可占数百 MB+，界面在并行数旁提示风险
+
+### 功能 3：日志分块
+
+- 维持单滚动面板（用户选定），每行日志前缀 `[W{n}]`（n=worker 序号 1..N），含 `=== 转换: name`、`OK → path`、`失败（退出码 N）` 各行的前缀
+- 转换开始前并行数锁定，保证运行期间前缀稳定
+
+### 增量测试场景
+
+- 单测：`scan_images`（文件/目录混合、顶层不递归、去重、扩展名过滤）
+- 手工：拖入文件、拖入文件夹、并行 2/4 张同时转、日志前缀对应、转换中改并行数被锁定

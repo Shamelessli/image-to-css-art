@@ -21,6 +21,16 @@ class OutputNameTests(unittest.TestCase):
     def test_leading_space_kept(self):
         self.assertEqual(resolve_output_names([Path(" (1).jpg")]), [" (1).html"])
 
+    def test_three_same_basename_distinct_dirs_no_duplicates(self):
+        names = resolve_output_names([Path("d1/a.jpg"), Path("d2/a.jpg"), Path("d3/a.jpg")])
+        self.assertEqual(names, ["a.html", "a.jpg.html", "a.jpg-2.html"])
+        self.assertEqual(len(names), len(set(names)))
+
+    def test_many_conflicts_get_incremented_numbers(self):
+        names = resolve_output_names([Path("d1/a.jpg"), Path("d2/a.jpg"), Path("d3/a.jpg"), Path("d4/a.jpg")])
+        self.assertEqual(names, ["a.html", "a.jpg.html", "a.jpg-2.html", "a.jpg-3.html"])
+        self.assertEqual(len(names), len(set(names)))
+
 
 IMAGE_EXTS_TEST = {".png", ".jpg", ".jpeg", ".bmp", ".webp", ".gif"}
 
@@ -40,19 +50,19 @@ class ScanImagesTests(unittest.TestCase):
 
     def test_mixed_files_and_dir_top_level_only(self):
         result = scan_images([self.root / "a.png", self.root / "c.txt", self.root])
-        self.assertEqual(result, [self.root / "a.png", self.root / "b.JPG"])
+        self.assertEqual(result, [(self.root / "a.png").resolve(), (self.root / "b.JPG").resolve()])
 
     def test_dir_does_not_recurse(self):
         result = scan_images([self.root])
-        self.assertNotIn(self.root / "sub" / "d.png", result)
+        self.assertNotIn((self.root / "sub" / "d.png").resolve(), result)
 
     def test_duplicates_removed(self):
         result = scan_images([self.root / "a.png", self.root / "a.png"])
-        self.assertEqual(result, [self.root / "a.png"])
+        self.assertEqual(result, [(self.root / "a.png").resolve()])
 
     def test_case_insensitive_extensions(self):
         result = scan_images([self.root / "b.JPG"])
-        self.assertEqual(result, [self.root / "b.JPG"])
+        self.assertEqual(result, [(self.root / "b.JPG").resolve()])
 
 
 class ParseDndDataTests(unittest.TestCase):

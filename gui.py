@@ -22,12 +22,24 @@ PRESETS = ("preview", "balanced", "faithful")
 
 
 def resolve_output_names(sources):
-    """同名输入追加原扩展名区分，返回与输入一一对应的输出文件名。"""
+    """同名输入追加原扩展名区分，返回与输入一一对应的输出文件名。
+
+    命名规则（确定性、保证结果无重复）：
+    - 输入顺序的第一个名称取 `stem.html`；
+    - 若与已用名称冲突，先尝试 `stem{原扩展名}.html`；
+    - 仍冲突则继续追加数字后缀：`stem{原扩展名}-2.html`、
+      `stem{原扩展名}-3.html`…… 直到不与已用名称重复。
+    """
     used, names = set(), []
     for src in sources:
+        stem = src.stem + src.suffix
         name = src.stem + ".html"
         if name in used:
-            name = src.stem + src.suffix + ".html"
+            name = stem + ".html"
+            i = 2
+            while name in used:
+                name = stem + f"-{i}.html"
+                i += 1
         used.add(name)
         names.append(name)
     return names
@@ -51,7 +63,7 @@ def scan_images(paths):
         key = f.resolve()
         if key not in seen:
             seen.add(key)
-            result.append(f)
+            result.append(key)
     return result
 
 
@@ -184,6 +196,9 @@ class App:
             target = self.files[0].parent
         else:
             return
+        if not target.exists():
+            messagebox.showwarning("提示", f"目录不存在: {target}")
+            return
         if os.name == "nt":
             os.startfile(str(target))
         else:
@@ -213,7 +228,7 @@ class App:
             if r.returncode != 0:
                 self._put("ensurepip 失败，请手动安装依赖")
                 return
-            self._put("安装依赖（pip install -r requirements.txt）...")
+            self._put("安装依赖（pip install -r requirements.txt tkinterdnd2）...")
             r = subprocess.run([str(VENV_PY), "-m", "pip", "install", "-r", str(REQ), "tkinterdnd2"], capture_output=True, text=True, encoding="utf-8", errors="replace")
             if r.stdout.strip():
                 self._put(r.stdout.strip())
@@ -266,24 +281,27 @@ class App:
             if item is None:
                 return
             src, out = item
-            self._put(f"{tag} === 转换: {src.name}")
-            cmd = [str(VENV_PY), str(CLI), "convert", str(src), "-o", str(out), "--preset", preset, "--force"]
-            if bg:
-                cmd += ["--background", bg]
-            if fit:
-                cmd += ["--fit", fit]
             try:
-                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", bufsize=1)
-                for line in proc.stdout:
-                    self._put(f"{tag} {line.rstrip()}")
-                proc.wait()
-                if proc.returncode == 0:
-                    ok.append(src)
-                    self._put(f"{tag} OK → {out}")
-                else:
-                    self._put(f"{tag} 失败（退出码 {proc.returncode}）")
-            except OSError as exc:
-                self._put(f"{tag} 无法启动转换进程: {exc}")
+                self._put(f"{tag} === 转换: {src.name}")
+                cmd = [str(VENV_PY), str(CLI), "convert", str(src), "-o", str(out), "--preset", preset, "--force"]
+                if bg:
+                    cmd += ["--background", bg]
+                if fit:
+                    cmd += ["--fit", fit]
+                try:
+                    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", bufsize=1, env={**os.environ, "PYTHONIOENCODING": "utf-8"})
+                    for line in proc.stdout:
+                        self._put(f"{tag} {line.rstrip()}")
+                    proc.wait()
+                    if proc.returncode == 0:
+                        ok.append(src)
+                        self._put(f"{tag} OK → {out}")
+                    else:
+                        self._put(f"{tag} 失败（退出码 {proc.returncode}）")
+                except OSError as exc:
+                    self._put(f"{tag} 无法启动转换进程: {exc}")
+            except Exception as exc:
+                self._put(f"{tag} 失败（意外异常: {exc}）")
 
     def _put(self, line):
         self.queue.put(line)
