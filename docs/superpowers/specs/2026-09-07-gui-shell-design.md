@@ -64,9 +64,14 @@
 
 ## 非目标
 
-- 不暴露全部 CLI 参数（仅预设/背景色/fit）
+- 不暴露全部 CLI 参数（仅预设/背景色/fit/并行数）
 - 不做转换后自动打开浏览器
-- 不打包为 exe（体积优先，bat 启动足够）
+
+## exe 打包（2026-09-07 追加）
+
+- 支持 PyInstaller 全量单文件打包：`打包EXE.bat`（GBK 编码），产出 `dist\ImageToCssArt.exe`（约 67MB，含 numpy/OpenCV/Pillow/tkinterdnd2/css_art，双击即用、可分发）
+- frozen 模式：`ROOT` 基于 exe 所在目录；转换通过 `--convert-worker` 自执行模式调用内置转换器（子进程隔离保留）；依赖检查改为进程内 import（避免 subprocess 探测引发自繁殖）
+- 窗口关闭（WM_DELETE_WINDOW）终止所有在跑的转换子进程；日志上限 1000 行
 
 ---
 

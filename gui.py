@@ -3,6 +3,7 @@
 import os
 import queue
 import subprocess
+import sys
 import threading
 from pathlib import Path
 import tkinter as tk
@@ -14,11 +15,32 @@ except ImportError:
     DND_FILES = None
     TkinterDnD = None
 
-ROOT = Path(__file__).resolve().parent
+IN_FROZEN = getattr(sys, "frozen", False)
+if IN_FROZEN:
+    ROOT = Path(sys.executable).resolve().parent
+else:
+    ROOT = Path(__file__).resolve().parent
 VENV_PY = ROOT / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 CLI = ROOT / "skills/image-to-css-art/scripts/image_to_css.py"
 REQ = ROOT / "skills/image-to-css-art/requirements.txt"
 PRESETS = ("preview", "balanced", "faithful")
+MAX_LOG_LINES = 1000
+
+
+def build_convert_cmd(src, out, preset, bg="", fit="", frozen=False):
+    """构建 convert 子进程命令。
+
+    frozen=True（PyInstaller 单文件）时让本程序以 --convert-worker 模式自执行，
+    转换器代码已打进 exe；否则调用项目 venv 的 CLI 脚本。
+    """
+    args = ["convert", str(src), "-o", str(out), "--preset", preset, "--force"]
+    if bg:
+        args += ["--background", bg]
+    if fit:
+        args += ["--fit", fit]
+    if frozen:
+        return [sys.executable, "--convert-worker"] + args
+    return [str(VENV_PY), str(CLI)] + args
 
 
 def resolve_output_names(sources):
@@ -102,9 +124,19 @@ class App:
         self.files = []
         self.queue = queue.Queue()
         self.busy = False
+        self._procs = set()
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self._build()
         self.root.after(100, self._poll)
         self._check_deps()
+
+    def _on_close(self):
+        for proc in list(self._procs):
+            try:
+                proc.terminate()
+            except OSError:
+                pass
+        self.root.destroy()
 
     def _build(self):
         frm = ttk.Frame(self.root, padding=8)
@@ -205,6 +237,15 @@ class App:
             subprocess.Popen(["xdg-open", str(target)])
 
     def _check_deps(self):
+        if IN_FROZEN:
+            try:
+                import numpy  # noqa: F401
+                import cv2  # noqa: F401
+                import PIL  # noqa: F401
+            except ImportError:
+                messagebox.showerror("错误", "打包环境缺少转换依赖，无法使用")
+                self.start.state(["disabled"])
+            return
         if not VENV_PY.exists():
             messagebox.showerror("错误", f"未找到虚拟环境: {VENV_PY}\n请先执行: python -m venv .venv")
             self.start.state(["disabled"])
@@ -283,16 +324,16 @@ class App:
             src, out = item
             try:
                 self._put(f"{tag} === 转换: {src.name}")
-                cmd = [str(VENV_PY), str(CLI), "convert", str(src), "-o", str(out), "--preset", preset, "--force"]
-                if bg:
-                    cmd += ["--background", bg]
-                if fit:
-                    cmd += ["--fit", fit]
+                cmd = build_convert_cmd(src, out, preset, bg, fit, IN_FROZEN)
                 try:
                     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", bufsize=1, env={**os.environ, "PYTHONIOENCODING": "utf-8"})
-                    for line in proc.stdout:
-                        self._put(f"{tag} {line.rstrip()}")
-                    proc.wait()
+                    self._procs.add(proc)
+                    try:
+                        for line in proc.stdout:
+                            self._put(f"{tag} {line.rstrip()}")
+                        proc.wait()
+                    finally:
+                        self._procs.discard(proc)
                     if proc.returncode == 0:
                         ok.append(src)
                         self._put(f"{tag} OK → {out}")
@@ -323,11 +364,17 @@ class App:
     def _log(self, text):
         self.log.configure(state=tk.NORMAL)
         self.log.insert(tk.END, text + "\n")
+        lines = int(self.log.index("end-1c").split(".")[0])
+        if lines > MAX_LOG_LINES:
+            self.log.delete("1.0", f"{lines - MAX_LOG_LINES}.0")
         self.log.see(tk.END)
         self.log.configure(state=tk.DISABLED)
 
 
 def main():
+    if IN_FROZEN and len(sys.argv) > 1 and sys.argv[1] == "--convert-worker":
+        from css_art.cli import main as cli_main
+        sys.exit(cli_main(sys.argv[2:]))
     root = (TkinterDnD.Tk() if TkinterDnD else tk.Tk())
     App(root)
     root.mainloop()

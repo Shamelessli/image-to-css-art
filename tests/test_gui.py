@@ -4,7 +4,34 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from gui import parse_dnd_data, resolve_output_names, scan_images, worker_tag
+from gui import build_convert_cmd, parse_dnd_data, resolve_output_names, scan_images, worker_tag
+
+
+class BuildConvertCmdTests(unittest.TestCase):
+    def test_script_mode_uses_venv_and_cli(self):
+        cmd = build_convert_cmd(Path("a.png"), Path("a.html"), "faithful", frozen=False)
+        self.assertTrue(str(cmd[0]).endswith("python.exe"))
+        self.assertTrue(str(cmd[1]).endswith("image_to_css.py"))
+        self.assertEqual(cmd[2:6], ["convert", "a.png", "-o", "a.html"])
+
+    def test_frozen_mode_self_exec(self):
+        cmd = build_convert_cmd(Path("a.png"), Path("a.html"), "preview", frozen=True)
+        self.assertEqual(cmd[1:3], ["--convert-worker", "convert"])
+
+    def test_force_always_present(self):
+        for frozen in (False, True):
+            cmd = build_convert_cmd(Path("a.png"), Path("a.html"), "faithful", frozen=frozen)
+            self.assertIn("--force", cmd)
+
+    def test_bg_and_fit_appended_only_when_nonempty(self):
+        cmd = build_convert_cmd(Path("a.png"), Path("a.html"), "faithful", bg="#f00", fit="20", frozen=True)
+        self.assertIn("--background", cmd)
+        self.assertIn("#f00", cmd)
+        self.assertIn("--fit", cmd)
+        self.assertIn("20", cmd)
+        cmd = build_convert_cmd(Path("a.png"), Path("a.html"), "faithful", frozen=True)
+        self.assertNotIn("--background", cmd)
+        self.assertNotIn("--fit", cmd)
 
 
 class OutputNameTests(unittest.TestCase):
